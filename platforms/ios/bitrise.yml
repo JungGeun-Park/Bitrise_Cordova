@@ -6,17 +6,88 @@ workflows:
   primary:
     steps:
     - git-clone@8: {}
-    - certificate-and-profile-installer@1: {}
+    - script@1:
+        title: Create Keychain
+        inputs:
+          - content: |-
+              #!/bin/bash
+              set -ex
+              security delete-keychain login.keychain-db || true
+              security create-keychain -p "$BITRISE_KEYCHAIN_PASSWORD" login.keychain-db
+              security default-keychain -s login.keychain-db
+              security unlock-keychain -p "$BITRISE_KEYCHAIN_PASSWORD" login.keychain-db
+              security set-keychain-settings -t 3600 -l login.keychain-db
+    - certificate-and-profile-installer@1:
+        inputs:
+          - certificate_url: "file://./platforms/ios/distribution.p12"
+          - certificate_passphrase: "$CERTIFICATE_PASSWORD"
+          - provisioning_profile_url: "file://./platforms/ios/profile.mobileprovision"
+          - keychain_path: "$HOME/Library/Keychains/login.keychain-db"
+          - keychain_password: "$BITRISE_KEYCHAIN_PASSWORD"
+          - team_id: "$BITRISE_TEAM_ID"
     - restore-npm-cache@1: {}
     - npm@1:
         inputs:
         - command: install
     - generate-cordova-build-configuration@0: {}
-    - cordova-archive@3:
+    - script@1:
+        title: Set Project Path and Scheme
         inputs:
-        - platform: "$CORDOVA_PLATFORM"
-        - target: emulator
-    - save-npm-cache@1: {}
+          - content: |-
+              #!/bin/bash
+              set -ex
+              
+              # Find iOS project path
+              PROJECT_PATH=$(find . -path "*/ios/*.xcodeproj" -type d | head -n 1)
+              if [ -z "$PROJECT_PATH" ]; then
+                echo "Error: No iOS Xcode project found"
+                exit 1
+              fi
+              
+              # Find scheme
+              SCHEME=$(xcodebuild -project "$PROJECT_PATH" -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
+              if [ -z "$SCHEME" ]; then
+                echo "Error: No scheme found"
+                exit 1
+              fi
+              
+              # Set environment variables
+              envman add --key BITRISE_PROJECT_PATH --value "$PROJECT_PATH"
+              envman add --key BITRISE_SCHEME --value "$SCHEME"
+              
+              echo "iOS Project Path: $PROJECT_PATH"
+              echo "Scheme: $SCHEME"
+    - script@1:
+        title: Update Build Number
+        inputs:
+          - content: |-
+              #!/bin/bash
+              set -ex
+              cd $BITRISE_SOURCE_DIR/ios/App
+              # Update iOS build number
+              agvtool new-version -all $BITRISE_BUILD_NUMBER
+              
+              # Update version in package.json
+              cd $BITRISE_SOURCE_DIR
+              VERSION=$(node -p "require('./package.json').version" | cut -d'+' -f1)
+              npm version "$VERSION-$BITRISE_BUILD_NUMBER" --no-git-tag-version
+    - xcode-archive@5:
+        inputs:
+          - project_path: "$BITRISE_SOURCE_DIR/platforms/ios/App.xcworkspace"
+          - scheme: App
+          - distribution_method: app-store
+          - automatic_code_signing: api-key
+          - configuration: Release
+          - certificate_url_list: "file://./platforms/ios/distribution.p12"
+          - passphrase_list: "$CERTIFICATE_PASSWORD"
+    - script@1:
+        title: Extract Bundle ID
+        inputs:
+          - content: |-
+              #!/bin/bash
+              set -ex
+              BUNDLE_ID=$(xcodebuild -showBuildSettings -project "$BITRISE_PROJECT_PATH" -target "$BITRISE_SCHEME" | grep PRODUCT_BUNDLE_IDENTIFIER | awk -F ' = ' '{print $2}' | tail -n 1)
+              envman add --key BITRISE_APP_BUNDLE_ID --value "$BUNDLE_ID"
     - deploy-to-bitrise-io@2: {}
     triggers:
       push:
@@ -30,3 +101,6 @@ meta:
 app:
   envs:
   - CORDOVA_PLATFORM: ios
+  - BITRISE_KEYCHAIN_PASSWORD: anything
+  - BITRISE_TEAM_ID: 22X77ENQ2H
+  - CERTIFICATE_PASSWORD: 123456
