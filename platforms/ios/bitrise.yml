@@ -37,25 +37,25 @@ workflows:
               #!/bin/bash
               set -ex
               
-              # Find iOS project path
-              PROJECT_PATH=$(find . -path "*/ios/*.xcodeproj" -type d | head -n 1)
-              if [ -z "$PROJECT_PATH" ]; then
-                echo "Error: No iOS Xcode project found"
+              # Find iOS workspace path
+              WORKSPACE_PATH=$(find . -path "*/ios/*.xcworkspace" -type d | head -n 1)
+              if [ -z "$WORKSPACE_PATH" ]; then
+                echo "Error: No iOS Xcode workspace found"
                 exit 1
               fi
               
               # Find scheme
-              SCHEME=$(xcodebuild -project "$PROJECT_PATH" -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
+              SCHEME=$(xcodebuild -workspace "$WORKSPACE_PATH" -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
               if [ -z "$SCHEME" ]; then
                 echo "Error: No scheme found"
                 exit 1
               fi
               
               # Set environment variables
-              envman add --key BITRISE_PROJECT_PATH --value "$PROJECT_PATH"
+              envman add --key BITRISE_WORKSPACE_PATH --value "$WORKSPACE_PATH"
               envman add --key BITRISE_SCHEME --value "$SCHEME"
               
-              echo "iOS Project Path: $PROJECT_PATH"
+              echo "iOS Workspace Path: $WORKSPACE_PATH"
               echo "Scheme: $SCHEME"
     - script@1:
         title: Update Build Number
@@ -73,7 +73,7 @@ workflows:
               npm version "$VERSION-$BITRISE_BUILD_NUMBER" --no-git-tag-version
     - xcode-archive@5:
         inputs:
-          - project_path: "$BITRISE_SOURCE_DIR/platforms/ios/App.xcworkspace"
+          - project_path: "$BITRISE_WORKSPACE_PATH"
           - scheme: App
           - distribution_method: app-store
           - automatic_code_signing: api-key
