@@ -37,19 +37,15 @@ workflows:
               #!/bin/bash
               set -ex
               
-              # Find iOS workspace path
-              WORKSPACE_PATH=$(find $BITRISE_SOURCE_DIR/platforms/ios -name "*.xcworkspace" | head -n 1)
-              if [ -z "$WORKSPACE_PATH" ]; then
-                echo "Error: No iOS Xcode workspace found"
+              # Manually set the correct workspace path
+              WORKSPACE_PATH="$BITRISE_SOURCE_DIR/platforms/ios/Bitrise_Cordova.xcworkspace"
+              
+              # Verify if the workspace file exists
+              if [ ! -f "$WORKSPACE_PATH" ]; then
+                echo "Error: Workspace file not found at $WORKSPACE_PATH"
                 exit 1
               fi
               
-              # Verify the correct workspace path
-              if [[ ! "$WORKSPACE_PATH" == *"Bitrise_Cordova.xcworkspace"* ]]; then
-                echo "Error: Incorrect workspace path found: $WORKSPACE_PATH"
-                exit 1
-              fi
-
               # Find scheme
               SCHEME=$(xcodebuild -workspace "$WORKSPACE_PATH" -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
               if [ -z "$SCHEME" ]; then
