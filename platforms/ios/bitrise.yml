@@ -75,14 +75,32 @@ workflows:
           - content: |-
               #!/bin/bash
               set -ex
-              cd $BITRISE_SOURCE_DIR/platforms/ios
-              # Update iOS build number
-              agvtool new-version -all $BITRISE_BUILD_NUMBER
-              
-              # Update version in package.json
-              cd $BITRISE_SOURCE_DIR
-              VERSION=$(node -p "require('./package.json').version" | cut -d'+' -f1)
-              npm version "$VERSION-$BITRISE_BUILD_NUMBER" --no-git-tag-version
+
+              # Navigate to the iOS project directory
+              cd "$BITRISE_SOURCE_DIR/platforms/ios"
+
+              # Check if agvtool is available
+              if ! command -v agvtool &> /dev/null; then
+                echo "Error: agvtool is not installed or not available in PATH."
+                exit 1
+              fi
+
+              # Enable versioning if not already enabled
+              if [ ! -f "$BITRISE_SOURCE_DIR/platforms/ios/.xcodeproj/project.pbxproj" ]; then
+                echo "Error: Xcode project file not found. Make sure the path is correct."
+                exit 1
+              fi
+
+              # Update the build number using $BITRISE_BUILD_NUMBER
+              agvtool new-version -all "$BITRISE_BUILD_NUMBER"
+
+              # Verify the update
+              CURRENT_BUILD_NUMBER=$(agvtool what-version -terse)
+              if [ "$CURRENT_BUILD_NUMBER" != "$BITRISE_BUILD_NUMBER" ]; then
+                echo "Error: Failed to update build number to $BITRISE_BUILD_NUMBER"
+                exit 1
+              fi
+              echo "Build number successfully updated to $CURRENT_BUILD_NUMBER"
     - xcode-archive@5:
         inputs:
           - project_path: "$BITRISE_WORKSPACE_PATH"
