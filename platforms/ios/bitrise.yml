@@ -98,7 +98,7 @@ workflows:
           - content: |-
               #!/bin/bash
               set -ex
-              BUNDLE_ID=$(xcodebuild -showBuildSettings -workspace "$BITRISE_WORKSPACE_PATH" -target "$BITRISE_SCHEME" | grep PRODUCT_BUNDLE_IDENTIFIER | awk -F ' = ' '{print $2}' | tail -n 1)
+              BUNDLE_ID=$(xcodebuild -showBuildSettings -workspace "$BITRISE_WORKSPACE_PATH" -scheme "$BITRISE_SCHEME" | grep PRODUCT_BUNDLE_IDENTIFIER | awk -F ' = ' '{print $2}' | tail -n 1)
               envman add --key BITRISE_APP_BUNDLE_ID --value "$BUNDLE_ID"
     - script@1:
         title: Run Generate Hash
