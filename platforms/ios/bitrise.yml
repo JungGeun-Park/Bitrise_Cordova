@@ -36,27 +36,37 @@ workflows:
           - content: |-
               #!/bin/bash
               set -ex
-              
-              # Manually set the correct workspace path
+
+              # Define the expected workspace path
               WORKSPACE_PATH="$BITRISE_SOURCE_DIR/platforms/ios/Bitrise_Cordova.xcworkspace"
-              
-              # Verify if the workspace file exists
-              if [ ! -f "$WORKSPACE_PATH" ]; then
+
+              # Check if the workspace file exists
+              if [ ! -d "$WORKSPACE_PATH" ]; then
                 echo "Error: Workspace file not found at $WORKSPACE_PATH"
-                exit 1
+                echo "Attempting to regenerate .xcworkspace..."
+                
+                # Attempt to regenerate the workspace using CocoaPods
+                cd "$BITRISE_SOURCE_DIR/platforms/ios"
+                pod install
+
+                # Recheck for the workspace file
+                if [ ! -d "$WORKSPACE_PATH" ]; then
+                  echo "Error: Failed to generate .xcworkspace at $WORKSPACE_PATH"
+                  exit 1
+                fi
               fi
-              
+
               # Find scheme
               SCHEME=$(xcodebuild -workspace "$WORKSPACE_PATH" -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
               if [ -z "$SCHEME" ]; then
                 echo "Error: No scheme found"
                 exit 1
               fi
-              
+
               # Set environment variables
               envman add --key BITRISE_WORKSPACE_PATH --value "$WORKSPACE_PATH"
               envman add --key BITRISE_SCHEME --value "$SCHEME"
-              
+
               echo "iOS Workspace Path: $WORKSPACE_PATH"
               echo "Scheme: $SCHEME"
     - script@1:
