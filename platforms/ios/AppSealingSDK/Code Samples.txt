@@ -6,6 +6,23 @@
 =============================================================================================================================================================
 *
 *
+*  [Run Script Phase Code for Xcode Framework Integration]
+*
+*
+=============================================================================================================================================================
+if [ "${CONFIGURATION}" == "Debug" ]; then
+    rm -R "${TARGET_BUILD_DIR}/AppSealingFramework.framework"
+    if [[ "${SDKROOT}" == *"Simulator"* ]]; then
+        cp -R "${SRCROOT}/AppSealingSDK/Libraries/Debug/AppSealingFramework.xcframework/ios-arm64_x86_64-simulator/AppSealingFramework.framework" "${TARGET_BUILD_DIR}/"
+    else
+        cp -R "${SRCROOT}/AppSealingSDK/Libraries/Debug/AppSealingFramework.xcframework/ios-arm64/AppSealingFramework.framework" "${TARGET_BUILD_DIR}/"
+    fi
+fi
+
+=============================================================================================================================================================
+=============================================================================================================================================================
+*
+*
 *  [Swift Security Alert GUI Code : ViewController.swift]
 *
 *
@@ -69,68 +86,69 @@ override func viewDidAppear(_ animated: Bool)
 =============================================================================================================================================================
 *
 *
-* [Swift Security Alert GUI Code : AppDelegate.swift]
+* [Flutter Security Alert GUI Code : AppDelegate.swift]
 *
 *
 =============================================================================================================================================================
 
-func application(_ application: UIApplication, didFinishLaunchingWithOptions
-     launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool
-{
-    // Override point for customization after application launch.
+override func application(
+  _ application: UIApplication,
+  didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+) -> Bool {
+  GeneratedPluginRegistrant.register(with: self)
+    //############################################################## AppSealing Code-Part BEGIN: DO NOT MODIFY THIS LINE !!!
+          let inst: AppSealingInterface = AppSealingInterface();
+          let tamper: Int32 = inst._IsAbnormalEnvironmentDetected();
+          if ( tamper > 0 )
+          {
+              var msg = "Abnormal Environment Detected !!";
+              if ( tamper & kAppSealingErrorJailbreakDetected ) > 0
+                  { msg += "\n - Jailbroken"; }
+              if ( tamper & kAppSealingErrorDRMDecrypted ) > 0
+                  { msg += "\n - Executable is not encrypted"; }
+              if ( tamper & kAppSealingErrorDebugAttached ) > 0
+                  { msg += "\n - App is debugged"; }
+              if ( tamper & ( kAppSealingErrorHashInfoCorrupted | kAppSealingErrorHashModified )) > 0
+                  { msg += "\n - App integrity corrupted"; }
+              if ( tamper & (kAppSealingErrorCodesignCorrupted | kAppSealingErrorExecutableCorrupted )) > 0
+                  { msg += "\n - App executable has corrupted"; }
+              if ( tamper & kAppSealingErrorCertificateChanged ) > 0
+                  { msg += "\n - App has re-signed"; }
+              if ( tamper & kAppSealingErrorBlacklistCorrupted ) > 0
+                  { msg += "\n - Blacklist/Whitelist has corrupted or missing"; }
+              if ( tamper & kAppSealingErrorCheatToolDetected ) > 0
+                  { msg += "\n - Cheat tool has detected"; }
 
-      //############################################################## AppSealing Code-Part BEGIN: DO NOT MODIFY THIS LINE !!!
-      let inst: AppSealingInterface = AppSealingInterface();
-      let tamper: Int32 = inst._IsAbnormalEnvironmentDetected();
-      if ( tamper > 0 )
-      {
-          var msg = "Abnormal Environment Detected !!";
-          if ( tamper & DETECTED_JAILBROKEN ) > 0
-              { msg += "\n - Jailbroken"; }
-          if ( tamper & DETECTED_DRM_DECRYPTED ) > 0
-              { msg += "\n - Executable is not encrypted"; }
-          if ( tamper & DETECTED_DEBUG_ATTACHED ) > 0
-              { msg += "\n - App is debugged"; }
-          if ( tamper & ( DETECTED_HASH_INFO_CORRUPTED | DETECTED_HASH_MODIFIED )) > 0
-              { msg += "\n - App integrity corrupted"; }
-          if ( tamper & ( DETECTED_CODESIGN_CORRUPTED | DETECTED_EXECUTABLE_CORRUPTED )) > 0
-              { msg += "\n - App executable has corrupted"; }
-          if ( tamper & DETECTED_CERTIFICATE_CHANGED ) > 0
-              { msg += "\n - App has re-signed"; }
-          if ( tamper & DETECTED_BLACKLIST_CORRUPTED ) > 0
-              { msg += "\n - Blacklist/Whitelist has corrupted or missing"; }
-          if ( tamper & DETECTED_CHEAT_TOOL ) > 0
-              { msg += "\n - Cheat tool has detected"; }
+              let alertController = UIAlertController(title: "AppSealing", message: msg, preferredStyle: .alert );
+              alertController.addAction(UIAlertAction(title: "Confirm", style: .default,
+                                      handler: { (action:UIAlertAction!) -> Void in
+                                  #if !DEBUG   // Debug mode does not kill app even if security threat has found
+                                          exit(0);
+                                  #endif
+                                      } ));
+              DispatchQueue.main.async {
+                  self.window?.rootViewController?.present( alertController, animated: true, completion: nil)
+              };
+          }
 
-          let alertController = UIAlertController(title: "AppSealing", message: msg, preferredStyle: .alert );
-          alertController.addAction(UIAlertAction(title: "Confirm", style: .default,
-                                  handler: { (action:UIAlertAction!) -> Void in
-                              #if !DEBUG   // Debug mode does not kill app even if security threat has found
-                                      exit(0);
-                              #endif
-                                  } ));
-          DispatchQueue.main.async {
-              self.window?.rootViewController?.present( alertController, animated: true, completion: nil)
-          };
-      }
+          AppSealingInterface._NotifySwizzlingDetected( { (msg: String?) -> () in
+              let alertController = UIAlertController( title: "AppSealing Security", message: msg, preferredStyle: .alert );
+              alertController.addAction( UIAlertAction( title: "Confirm", style: .default,
+                                                          handler: { ( action:UIAlertAction! ) -> Void in
+      #if DEBUG
+      #else
+                  exit(0);
+      #endif
+              } ));
+              
+              DispatchQueue.main.async {
+                  self.window?.rootViewController?.present( alertController, animated: true, completion: nil )
+              };
+          });
 
-      AppSealingInterface._NotifySwizzlingDetected( { (msg: String?) -> () in
-          let alertController = UIAlertController( title: "AppSealing Security", message: msg, preferredStyle: .alert );
-          alertController.addAction( UIAlertAction( title: "Confirm", style: .default,
-                                                      handler: { ( action:UIAlertAction! ) -> Void in
-  #if DEBUG
-  #else
-              exit(0);
-  #endif
-          } ));
-          
-          DispatchQueue.main.async {
-              self.window?.rootViewController?.present( alertController, animated: true, completion: nil )
-          };
-      });
+          //############################################################## AppSealing Code-Part END: DO NOT MODIFY THIS LINE !!!
 
-      //############################################################## AppSealing Code-Part END: DO NOT MODIFY THIS LINE !!!
-    return true;
+  return super.application(application, didFinishLaunchingWithOptions: launchOptions)
 }
 
 =============================================================================================================================================================
@@ -352,32 +370,48 @@ catch( e )
     console.log( "### AppSealing Security Check : " + e.ToString() );
 }
 
-AppSealingPeriodicAlerted = false;
-function AppSealingPeriodicCheck() {
-    if( AppSealingPeriodicAlerted ){
+const PERIODIC_DETECTED_START_CODE      = 0;
+const PERIODIC_DETECTED_JAILBROKEN      = 1;
+const PERIODIC_DETECTED_METHOD_SWIZZLE  = 2;
+const PERIODIC_DETECTED_METHOD_HOOK     = 3;
+const PERIODIC_DETECTED_CHEAT_TOOL      = 4;
+const PERIODIC_INTEGRITY_CHECK_FAILED   = 5;
+const PERIODIC_DETECTED_ABNORMAL_ENV    = 6;
+const PERIODIC_DETECTED_LAST_CODE       = 7;
+
+let AppSealingPeriodicAlerted = false;
+function AppSealingPeriodicCheck()
+ {
+    if ( AppSealingPeriodicAlerted )
         return;
-    }
+    
     try
     {
         const {AppSealingInterfaceBridge} = NativeModules;
 
         let ret = parseInt( AppSealingInterfaceBridge.IsSwizzlingDetectedReturnRN() );
         
-        if ( ret >= 1 && ret <= 3 )
+        if ( ret > PERIODIC_DETECTED_START_CODE && ret < PERIODIC_DETECTED_LAST_CODE )
         {
             // Show GUI
             let msg = "\n--------------------------------------"
                     + "\nAbnormal Environment Detected !!"
                     + "\n--------------------------------------\n";
-            if ( ret == 1 )
+            if ( ret == PERIODIC_DETECTED_JAILBROKEN )
                 msg += "\n - Jailbroken";
-            if ( ret == 2 )
+            if ( ret == PERIODIC_DETECTED_METHOD_SWIZZLE )
                 msg += "\n - Method Swizzling";
-            if ( ret == 3 )
+            if ( ret == PERIODIC_DETECTED_METHOD_HOOK )
                 msg += "\n - Method Hooking";
+            if ( ret == PERIODIC_DETECTED_CHEAT_TOOL )
+                msg += "\n - Cheat Tool found";
+            if ( ret == PERIODIC_INTEGRITY_CHECK_FAILED )
+                msg += "\n - Integrity check failed";
+            if ( ret == PERIODIC_DETECTED_ABNORMAL_ENV )
+                msg += "\n - Abnormal environment found";
     
             console.log( "AppSealing Security Threat: " + msg );
-            Alert.alert( "AppSealing Security Threat", msg, [{ text: "Confirm", onPress: () => { AppSealingInterfaceBridge.ExitApp(); }}], { cancelable: false } );
+            setTimeout( ()=> { Alert.alert( "AppSealing Security Threat", msg, [{ text: "Confirm", onPress: () => { AppSealingInterfaceBridge.ExitApp(); }}], { cancelable: false } ); }, 500 );
 
             AppSealingPeriodicAlerted = true;
         }    
@@ -387,7 +421,7 @@ function AppSealingPeriodicCheck() {
         console.log( "### AppSealing Security Check : " + e.ToString() );
     }
 }
-setInterval(AppSealingPeriodicCheck, 2500); // 2.5ms
+setInterval( AppSealingPeriodicCheck, 2000 ); // 2ms
 //############################################################## AppSealing Code-Part END: DO NOT MODIFY THIS LINE !!!
 
 
@@ -422,14 +456,30 @@ platform :ios do
     # 프로젝트 이름 및 스킴 자동 추출
     project_name = File.basename(xcode_file_path, File.extname(xcode_file_path)) # 확장자를 제거한 프로젝트 이름
 
-    # 스킴 자동 검색
-    scheme_name = ""
+    # 스킴 목록 가져오기
+    scheme_list = []
     Dir.chdir(File.dirname(xcode_file_path)) do
-      scheme_name = sh("xcodebuild -list -#{xcode_file_path.end_with?('.xcworkspace') ? 'workspace' : 'project'} #{File.basename(xcode_file_path)} | grep 'Schemes:' -A 1 | tail -n 1").strip
+      scheme_list_command = "xcodebuild -list -#{xcode_file_path.end_with?('.xcworkspace') ? 'workspace' : 'project'} #{File.basename(xcode_file_path)}"
+      scheme_list_output = sh(scheme_list_command).lines.map(&:strip).reject { |line| line.empty? }
+      scheme_list_output.each do |line|
+        if line.start_with?("Schemes:")
+          next
+        elsif line.start_with?("Targets:")
+          break
+        else
+          scheme_list << line
+        end
+      end
     end
 
-    if scheme_name.empty?
-      UI.user_error!("[AppSealing] Failed to retrieve scheme name from Xcode project or workspace.")
+    if scheme_list.empty?
+      UI.user_error!("[AppSealing] No schemes found in the Xcode project or workspace.")
+    end
+
+    # 프로젝트 이름과 가장 유사한 스킴 자동 선택
+    scheme_name = scheme_list.max_by do |scheme|
+      similarity = levenshtein_distance(project_name, scheme)
+      -similarity # 낮은 거리(유사도 높음)를 우선으로 선택
     end
 
     # 번들 ID 동적으로 추출
@@ -544,6 +594,23 @@ platform :ios do
        end
      end
    end
+end
+def levenshtein_distance(str1, str2)
+  m = str1.length + 1
+  n = str2.length + 1
+  d = Array.new(m) { Array.new(n, 0) }
+
+  (1...m).each { |i| d[i][0] = i }
+  (1...n).each { |j| d[0][j] = j }
+
+  (1...m).each do |i|
+    (1...n).each do |j|
+      cost = str1[i - 1] == str2[j - 1] ? 0 : 1
+      d[i][j] = [d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost].min
+    end
+  end
+
+  d[m - 1][n - 1]
 end
 
 =============================================================================================================================================================
@@ -748,14 +815,30 @@ platform :ios do
     # 프로젝트 이름 및 스킴 자동 추출
     project_name = File.basename(xcode_file_path, File.extname(xcode_file_path)) # 확장자를 제거한 프로젝트 이름
 
-    # 스킴 자동 검색
-    scheme_name = ""
+    # 스킴 목록 가져오기
+    scheme_list = []
     Dir.chdir(File.dirname(xcode_file_path)) do
-      scheme_name = sh("xcodebuild -list -#{xcode_file_path.end_with?('.xcworkspace') ? 'workspace' : 'project'} #{File.basename(xcode_file_path)} | grep 'Schemes:' -A 1 | tail -n 1").strip
+      scheme_list_command = "xcodebuild -list -#{xcode_file_path.end_with?('.xcworkspace') ? 'workspace' : 'project'} #{File.basename(xcode_file_path)}"
+      scheme_list_output = sh(scheme_list_command).lines.map(&:strip).reject { |line| line.empty? }
+      scheme_list_output.each do |line|
+        if line.start_with?("Schemes:")
+          next
+        elsif line.start_with?("Targets:")
+          break
+        else
+          scheme_list << line
+        end
+      end
     end
 
-    if scheme_name.empty?
-      UI.user_error!("[AppSealing] Failed to retrieve scheme name from Xcode project or workspace.")
+    if scheme_list.empty?
+      UI.user_error!("[AppSealing] No schemes found in the Xcode project or workspace.")
+    end
+
+    # 프로젝트 이름과 가장 유사한 스킴 자동 선택
+    scheme_name = scheme_list.max_by do |scheme|
+      similarity = levenshtein_distance(project_name, scheme)
+      -similarity # 낮은 거리(유사도 높음)를 우선으로 선택
     end
 
     UI.message "[AppSealing] Project Name: #{project_name}"
